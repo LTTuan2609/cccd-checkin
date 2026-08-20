@@ -92,47 +92,26 @@ switch (args[0].ToLowerInvariant())
             return 2;
         }
 
-        var (key, _) = SigningKeyStore.CreateOrLoad(opts.GetValueOrDefault("key"));
-        using (key)
+        using var signingKey = SigningKeyStore.CreateOrLoad(opts.GetValueOrDefault("key")).Key;
+        var issued = LicenseIssueService.Issue(signingKey, machine, plan, days,
+            keyId: "prod-2026-01", issuedAtUtc: DateTimeOffset.UtcNow);
+
+        Console.WriteLine("--- THÔNG TIN LICENSE ---");
+        Console.WriteLine("LicenseId:     " + issued.LicenseId);
+        Console.WriteLine("Product:       " + issued.Payload.Product);
+        Console.WriteLine("Mã Máy:        " + machine);
+        Console.WriteLine("Gói:           " + plan);
+        Console.WriteLine("Hiệu lực:      " + issued.Payload.NotBeforeUtc.ToString("yyyy-MM-dd HH:mm 'UTC'"));
+        Console.WriteLine("Hết hạn:       " + issued.Payload.ExpiresAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'"));
+        Console.WriteLine();
+        Console.WriteLine("--- MÃ KÍCH HOẠT (gửi cho khách) ---");
+        Console.WriteLine(issued.ActivationCode);
+        Console.WriteLine();
+
+        if (opts.TryGetValue("out", out var outFile))
         {
-            // Mã Máy chính là machineKeyHash (base64url) — binding trực tiếp, không hashing lại.
-            var machineKeyHash = machine.Trim();
-
-            var nowUtc = DateTimeOffset.UtcNow;
-            var payload = new LicensePayload
-            {
-                Version = LicensingDefaults.PayloadVersion,
-                Product = LicensingDefaults.Product,
-                LicenseId = "LIC-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant(),
-                MachineKeyHash = machineKeyHash,
-                Plan = plan,
-                IssuedAtUtc = nowUtc,
-                NotBeforeUtc = nowUtc,
-                ExpiresAtUtc = nowUtc.AddDays(days),
-                KeyId = "prod-2026-01",
-            };
-
-            var canonical = new LicenseCanonicalizer().Canonicalize(payload);
-            var signature = key.SignData(canonical, HashAlgorithmName.SHA256);
-            var code = ActivationCodeCodec.Encode(canonical, signature);
-
-            Console.WriteLine("--- THÔNG TIN LICENSE ---");
-            Console.WriteLine("LicenseId:     " + payload.LicenseId);
-            Console.WriteLine("Product:       " + payload.Product);
-            Console.WriteLine("Mã Máy:        " + machine);
-            Console.WriteLine("Gói:           " + plan);
-            Console.WriteLine("Hiệu lực:      " + payload.NotBeforeUtc.ToString("yyyy-MM-dd HH:mm 'UTC'"));
-            Console.WriteLine("Hết hạn:       " + payload.ExpiresAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'"));
-            Console.WriteLine();
-            Console.WriteLine("--- MÃ KÍCH HOẠT (gửi cho khách) ---");
-            Console.WriteLine(code);
-            Console.WriteLine();
-
-            if (opts.TryGetValue("out", out var outFile))
-            {
-                File.WriteAllText(outFile, code);
-                Console.WriteLine("Đã ghi file:   " + Path.GetFullPath(outFile));
-            }
+            File.WriteAllText(outFile, issued.ActivationCode);
+            Console.WriteLine("Đã ghi file:   " + Path.GetFullPath(outFile));
         }
 
         return 0;
