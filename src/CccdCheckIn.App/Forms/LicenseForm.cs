@@ -14,7 +14,7 @@ public sealed class LicenseForm : Form
     private readonly IMachineIdentityProvider _identity;
     private readonly Action _refreshMain;
 
-    private Label _lblMachineCode = null!;
+    private TextBox _lblMachineCode = null!;
     private Label _lblStatus = null!;
     private TextBox _txtCode = null!;
     private Button _btnCopy = null!;
@@ -83,22 +83,33 @@ public sealed class LicenseForm : Form
             Padding = new Padding(0, 6, 0, 2),
         };
 
-        _lblMachineCode = new Label
+        // TextBox ReadOnly thay cho Label → người dùng bôi đen/copy bằng chuột được luôn
+        // (Label không cho text selection — trước đây chỉ có nút Sao chép mà lại không được
+        //  add vào layout nên vô hình, user không copy được Mã Máy).
+        _lblMachineCode = new TextBox
         {
             Dock = DockStyle.Fill,
             AutoSize = false,
+            ReadOnly = true,
             Font = new Font("Consolas", 11f),
             ForeColor = Color.FromArgb(20, 60, 130),
-            Padding = new Padding(4, 4, 4, 4),
-            BackColor = Color.FromArgb(240, 244, 250),
+            BackColor = Color.FromArgb(245, 248, 252),
             BorderStyle = BorderStyle.FixedSingle,
         };
+        _lblMachineCode.Click += (_, _) => _lblMachineCode.SelectAll();
 
         _btnCopy = new Button { Text = "Sao chép Mã Máy", AutoSize = false, Width = 160, Height = 32 };
         _btnCopy.Click += (_, _) =>
         {
             Clipboard.SetText(_lblMachineCode.Text.Trim());
             _btnCopy.Text = "✓ Đã sao chép";
+            var t = this;
+            t.BeginInvoke(new Action(async () =>
+            {
+                await Task.Delay(1500);
+                if (IsDisposed) return;
+                _btnCopy.Text = "Sao chép Mã Máy";
+            }));
         };
 
         var statusWrapper = new Panel { Dock = DockStyle.Fill, AutoSize = false, Height = 52, Padding = new Padding(0, 8, 0, 4) };
@@ -159,9 +170,25 @@ public sealed class LicenseForm : Form
         actionRow.Controls.Add(_btnImport);
         actionRow.Controls.Add(_btnDone);
 
+        // Nút Sao chép đặt cạnh ô Mã Máy (trong 1 panel cùng hàng) — rõ ràng, dễ thấy.
+        var machineRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            Height = 36,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 2, 0, 2),
+        };
+        _lblMachineCode.Height = 28;
+        _btnCopy.Height = 28;
+        _btnCopy.Margin = new Padding(8, 0, 0, 0);
+        machineRow.Controls.Add(_lblMachineCode);
+        machineRow.Controls.Add(_btnCopy);
+
         layout.Controls.Add(intro, 0, 0);
         layout.Controls.Add(machineLabel, 0, 1);
-        layout.Controls.Add(_lblMachineCode, 0, 2);
+        layout.Controls.Add(machineRow, 0, 2);
         layout.Controls.Add(statusWrapper, 0, 3);
         layout.Controls.Add(codeLabel, 0, 4);
         layout.Controls.Add(_txtCode, 0, 5);
