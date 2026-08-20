@@ -11,5 +11,5 @@ public static class EmbeddedKeys
     public const string CurrentKeyId = "prod-2026-01";
 
     /// <summary>Public key base64 (SPKI). Sinh bởi lệnh create-keys của LicenseIssuer.</summary>
-    public const string LicensePublicKeyBase64 = "";
+    public const string LicensePublicKeyBase64 = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaJ1XXjaJ7Ug5ZJwszySqlW1+0Hd9LhZiFF4D7QFSCNIF/4kmzelO1haX6ILWB30mL31FZxkKxNSZGm6UkDHoFA==";
 }
