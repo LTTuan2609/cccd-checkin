@@ -10,6 +10,12 @@ Data/            # checkin.db (dữ liệu công dân), crash.log, rejected.log
 *.db-wal
 *.log
 
+# Private key ký license + license phát hành — chỉ ở máy nhà cung cấp
+private-key*.json
+private-key*.pem
+*.license
+%ProgramData%/LTTuan/
+
 # User-specific / editor
 .vs/
 *.user

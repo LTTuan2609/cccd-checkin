@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -19,7 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\CccdCheckIn.App\CccdCheckIn.App.csproj" />
     <ProjectReference Include="..\..\src\CccdCheckIn.Core\CccdCheckIn.Core.csproj" />
+    <ProjectReference Include="..\..\src\CccdCheckIn.Licensing.Windows\CccdCheckIn.Licensing.Windows.csproj" />
     <ProjectReference Include="..\..\src\CccdCheckIn.Reader.Serial\CccdCheckIn.Reader.Serial.csproj" />
     <ProjectReference Include="..\..\src\CccdCheckIn.Storage.Sqlite\CccdCheckIn.Storage.Sqlite.csproj" />
   </ItemGroup>

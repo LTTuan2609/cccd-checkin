@@ -1,6 +1,8 @@
 using CccdCheckIn.App.Config;
+using CccdCheckIn.App.Forms;
 using CccdCheckIn.App.Services;
 using CccdCheckIn.Core.Contracts;
+using CccdCheckIn.Core.Licensing;
 using CccdCheckIn.Core.Models;
 using CccdCheckIn.Storage.Sqlite;
 
@@ -24,6 +26,8 @@ public partial class MainForm : Form
     private Button _btnSettings = null!;
     private Button _btnExport = null!;
     private Button _btnExit = null!;
+    private Button _btnLicense = null!;
+    private Label _lblLicenseInfo = null!;
     private Label _lblTodayValue = null!;
     private Label _lblTotalValue = null!;
     private Label _lblLastScan = null!;
@@ -38,7 +42,59 @@ public partial class MainForm : Form
 
         InitializeComponent();
         WireEvents();
+        ApplyLicenseState();
         RefreshCounters();
+    }
+
+    /// <summary>Cập nhật UI theo trạng thái license — hết hạn chỉ bật đọc/xuất, KHÔNG khóa dữ liệu.</summary>
+    private void ApplyLicenseState()
+    {
+        var gate = _root.Gate;
+        if (gate is null)
+        {
+            // Licensing tắt qua config → hiển thị như bình thường (không dùng nút/khu license).
+            _btnLicense.Visible = false;
+            _lblLicenseInfo.Visible = false;
+            return;
+        }
+
+        // Luôn cho đọc/xuất/cài đặt. Chỉ chặn quét mới (check-in) khi hết hạn.
+        var result = gate.LastResult;
+        var canCheckIn = gate.CanCheckIn;
+
+        // Banner thông tin license — ưu tiên hiển thị cảnh báo/trạng thái.
+        _lblLicenseInfo.Text = result.Status switch
+        {
+            LicenseStatus.Trial => $"🎯 Dùng thử — còn {result.DaysRemaining ?? 0} ngày. Mua: bấm Bản quyền.",
+            LicenseStatus.TrialExpired => "⛔ Hết thời gian dùng thử — Bản quyền để kích hoạt.",
+            LicenseStatus.Expired => "⛔ " + (result.Message ?? "Đã hết hạn"),
+            LicenseStatus.Valid => $"✓ License còn {result.DaysRemaining ?? 0} ngày",
+            _ => result.Message ?? "",
+        };
+        _lblLicenseInfo.ForeColor = result.Status switch
+        {
+            LicenseStatus.Valid or LicenseStatus.Trial => Color.FromArgb(74, 122, 92),
+            LicenseStatus.TrialExpired or LicenseStatus.Expired => Color.Maroon,
+            _ => Color.FromArgb(150, 100, 0),
+        };
+        _lblLicenseInfo.Visible = true;
+        _btnLicense.Visible = true;
+
+        // Hết hạn: dừng reader + tắt nút kết nối lại (không ghi được mới).
+        // KHÔNG gọi Start() khi form chưa có handle (ctor) — Start() có thể bắn sự kiện
+        // đồng bộ → BeginInvoke ném "window handle has not yet been created". Khởi động
+        // lần đầu do OnShown đảm nhận; nhánh dưới chỉ phục vụ trường hợp kích hoạt
+        // thành công khi app ĐANG chạy (handle đã tồn tại).
+        if (!canCheckIn)
+        {
+            _pipeline.Stop();
+            _btnReconnect.Enabled = false;
+        }
+        else if (IsHandleCreated && _ui.AutoStartListening &&
+                 _pipeline.Reader.State is ReaderState.Disconnected or ReaderState.Error)
+        {
+            _pipeline.Start();
+        }
     }
 
     /// <summary>
@@ -52,7 +108,11 @@ public partial class MainForm : Form
         if (_autoStarted) return;
         _autoStarted = true;
         LoadRecentLog();
-        if (_ui.AutoStartListening) _pipeline.Start();
+
+        // Auto-start listener: license hợp lệ thì mới nghe; hết hạn đã xử lý trong ApplyLicenseState.
+        var gate = _root.Gate;
+        if (_ui.AutoStartListening && (gate is null || gate.CanCheckIn))
+            _pipeline.Start();
     }
 
     protected override void Dispose(bool disposing)
@@ -213,7 +273,11 @@ public partial class MainForm : Form
         };
         _lblStatus.Text = text;
         _lblStatus.ForeColor = color;
-        _btnReconnect.Enabled = e.State is ReaderState.Reconnecting or ReaderState.Error;
+        // Chỉ cho reconnect khi license còn cho ghi — nếu thiếu điều kiện này,
+        // ApplyReaderState sẽ bật lại nút mà ApplyLicenseState vừa tắt khi hết hạn
+        // → bypass license qua nút Kết nối lại.
+        _btnReconnect.Enabled = e.State is ReaderState.Reconnecting or ReaderState.Error
+                                && (_root.Gate is null || _root.Gate.CanCheckIn);
     }
 
     private enum AlertKind { None, Warning, Error }
@@ -282,6 +346,13 @@ public partial class MainForm : Form
 
     private void OnReconnectClicked(object? sender, EventArgs e)
     {
+        // Chặn bypass lần 2 (lớp phòng thủ sau ApplyReaderState): hết hạn không được
+        // resume chấm công qua nút Kết nối lại dù nút có lỡ được bật.
+        if (_root.Gate is not null && !_root.Gate.CanCheckIn)
+        {
+            ShowAlert("License hết hạn — bấm Bản quyền để gia hạn trước khi kết nối máy quét.", AlertKind.Warning);
+            return;
+        }
         try
         {
             _pipeline.Reader.Start();
@@ -303,6 +374,15 @@ public partial class MainForm : Form
             LoadRecentLog();
             RefreshCounters();
         }
+    }
+
+    private void OnLicenseClicked(object? sender, EventArgs e)
+    {
+        if (_root.Licensing is null || _root.Gate is null || _root.Identity is null) return;
+
+        using var form = new LicenseForm(_root.Licensing, _root.Gate, _root.Identity, RefreshCounters);
+        form.ShowDialog(this);
+        ApplyLicenseState();   // sau khi đóng — nếu kích hoạt/hết hạn thay đổi thì cập nhật UI
     }
 
     private void OnExitClicked(object? sender, EventArgs e)
@@ -364,6 +444,15 @@ public partial class MainForm : Form
         _btnSettings = new Button { Text = "Cài đặt", AutoSize = true };
         _btnExport = new Button { Text = "Xuất CSV", AutoSize = true };
         _btnExit = new Button { Text = "Thoát", AutoSize = true };
+        _btnLicense = new Button { Text = "Bản quyền", AutoSize = true };
+
+        _lblLicenseInfo = new Label
+        {
+            Dock = DockStyle.Bottom, Height = 24, TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoEllipsis = true,
+            ForeColor = Color.FromArgb(74, 122, 92),
+            Padding = new Padding(6, 2, 0, 0),
+        };
 
         _lblTodayValue = new Label
         {
@@ -423,11 +512,12 @@ public partial class MainForm : Form
             FlowDirection = FlowDirection.LeftToRight, WrapContents = false,
         };
         // Khoảng cách đều giữa các nút (FlowLayoutPanel mặc định margin 3px — dính quá).
-        foreach (var b in new[] { _btnReconnect, _btnSettings, _btnExport, _btnExit })
+        foreach (var b in new[] { _btnReconnect, _btnSettings, _btnExport, _btnLicense, _btnExit })
             b.Margin = new Padding(0, 0, 10, 0);
         toolbar.Controls.Add(_btnReconnect);
         toolbar.Controls.Add(_btnSettings);
         toolbar.Controls.Add(_btnExport);
+        toolbar.Controls.Add(_btnLicense);
         toolbar.Controls.Add(_btnExit);
 
         // Cột thống kê — mỗi thẻ là TableLayoutPanel (tiêu đề AutoSize + số Fill)
@@ -475,6 +565,7 @@ public partial class MainForm : Form
         Controls.Add(gridWrap);
         Controls.Add(leftCol);
         Controls.Add(_lblAlert);
+        Controls.Add(_lblLicenseInfo);
         Controls.Add(toolbar);
         Controls.Add(_lblStatus);
 
@@ -488,5 +579,6 @@ public partial class MainForm : Form
         _btnReconnect.Click += OnReconnectClicked;
         _btnSettings.Click += OnSettingsClicked;
         _btnExit.Click += OnExitClicked;
+        _btnLicense.Click += OnLicenseClicked;
     }
 }

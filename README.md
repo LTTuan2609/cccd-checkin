@@ -113,11 +113,39 @@ Toàn bộ hành vi app nằm trong 1 file JSON — không hardcode. Sửa bằn
   "Export": {
     "Fields": [ "CheckedInAt", "CccdNumber", "FullName", "Address" ],
     "CsvPath": "Data/export"
+  },
+  "Licensing": {
+    "Enabled": true,        // false = tắt licensing (dùng nội bộ/kiểm thử)
+    "TrialDays": 14         // số ngày dùng thử
   }
 }
 ```
 
-### Trường dữ liệu hỗ trợ — tùy chỉnh lưu / xuất
+### Licensing — bản quyền & thuê bao
+
+Ứng dụng chạy theo mô hình **dùng thử → thuê bao tháng/năm**, hoạt động 100% offline:
+
+- **Lần đầu chạy**: tự bật **dùng thử 14 ngày** (banner "🎯 Dùng thử — còn N ngày").
+- **Hết dùng thử / hết thuê bao**: app chuyển sang **chế độ chỉ đọc + xuất** —
+  vẫn xem lịch sử, xuất CSV, backup DB; **chỉ chặn ghi check-in mới**. **Dữ liệu luôn là của bạn**,
+  không bao giờ bị xóa/khoá/mã hóa vì license.
+- **Nút "Bản quyền"** trên toolbar: hiện **Mã Máy**, nhập/dán **Mã Kích Hoạt** hoặc import file `.license`.
+
+**Luồng mua/gia hạn (offline):**
+
+1. Khách cài app, mở **Bản quyền** → **Sao chép Mã Máy**.
+2. Gửi Mã Máy + thông tin công ty cho nhà cung cấp → chuyển khoản gói tháng/năm.
+3. Nhà cung cấp chạy tool nội bộ `CccdCheckIn.LicenseIssuer` tạo **Mã Kích Hoạt** (chữ ký số) → gửi lại.
+4. Khách **Dán** Mã Kích Hoạt (hoặc Mở file `.license`) → **Kích hoạt** → app switch sang **Active**.
+
+> Mã Kích Hoạt là chữ ký **ECDSA P-256** trên (Mã Máy + gói + hạn), chỉ nhà cung cấp
+> (giữ private key) ký được. App chỉ nhúng public key để verify — khách không thể tự chế mã.
+> Chống gian lận trial là *best-effort* trên máy khách (Administrator vẫn có thể xóa state),
+> đây là giới hạn chung của phần mềm desktop offline.
+
+---
+
+## 5. Bảo mật & lưu ý vận hành
 
 | Khóa | Mô tả |
 |---|---|
@@ -177,12 +205,15 @@ src\
     SerialCccdReader.cs, ScanBuffer.cs, ComPortAutoDetector.cs, ReaderPortConfig.cs
   CccdCheckIn.Storage.Sqlite\ ← plugin lưu trữ: SQLite + xuất CSV (BOM) + log rejected
     SqliteCheckInStore.cs, CheckInSchema.cs, CheckInCsvExporter.cs
+  CccdCheckIn.Licensing.Windows\ ← plugin licensing: DPAPI machine key + trial + verify ECDSA
+    DpapiMachineKeyStore.cs, LicenseService.cs, WindowsLicenseStore.cs, EmbeddedKeys.cs
   CccdCheckIn.App\          ← WinForms dashboard + composition root (nối dây theo config)
-    Program.cs, CompositionRoot.cs, MainForm.cs, SettingsForm.cs
+    Program.cs, CompositionRoot.cs, MainForm.cs, SettingsForm.cs, Forms\LicenseForm.cs
     Config\AppConfig.cs, AppConfigFactory.cs
     Services\CheckInPipeline.cs, DuplicateScanGuard.cs, SimulatedCccdReader.cs
-tests\CccdCheckIn.Tests\     ← xUnit: parser, store, exporter, chống trùng
+tests\CccdCheckIn.Tests\     ← xUnit: parser, store, exporter, chống trùng, licensing, invariant
 tools\CccdCheckIn.Simulator\ ← gửi chuỗi mẫu ra COM để test e2e
+tools\CccdCheckIn.LicenseIssuer\ ← tool nội bộ (KHÔNG ship): create-keys + issue Mã Kích Hoạt
 publish.ps1                ← đóng gói self-contained 1 file
 publish\win-x64\           ← sản phẩm bàn giao (exe + appsettings.json)
 ```
@@ -205,10 +236,18 @@ dotnet test tests/CccdCheckIn.Tests/CccdCheckIn.Tests.csproj
 
 - Demo không cần thẻ: đổi `Reader.Mode = "Simulated"` → app tự đẩy 1 mẫu QR mỗi giây qua đúng pipeline.
 - Test thật trên cổng COM: cắm máy quét, mở Cài đặt, chọn cổng, quét CCCD thật.
+- Licensing: lần đầu chạy tạo `%ProgramData%\LTTuan\CccdCheckIn\` (machine key + trial state).
+  Nếu mã hóa DB chưa làm, đây là nơi lưu identity/trial — chạy bản Simulated để xem banner trial.
 
 ---
 
 ## 7. Changelog
 
+- **v1.1 (licensing)** — Trial 14 ngày → thuê bao tháng/năm, hoạt động offline:
+  - Mã Máy + Mã Kích Hoạt (ECDSA P-256), machine identity gắn DPAPI
+  - Hết hạn = Read/Export-only — dữ liệu khách hàng không bao giờ bị khóa/xóa
+  - Màn hình Bản quyền (copy Mã Máy, nhập/import Mã Kích Hoạt)
+  - Tool nội bộ `CccdCheckIn.LicenseIssuer` (create-keys / issue)
+  - Integration test `ExpiredLicenseDataSafety` bảo vệ invariant dữ liệu
 - **v1.0** — Dashboard check-in hoàn chỉnh: đọc QR qua COM (tự dò VID/PID, tự kết nối lại),
   lưu SQLite theo cấu hình, xuất CSV có BOM, chống quét trùng, log QR lỗi, single-instance.

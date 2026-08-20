@@ -14,6 +14,14 @@ public sealed class AppConfig
     public StoreSettings Store { get; set; } = new();
     public UiSettings Ui { get; set; } = new();
     public ExportSettings Export { get; set; } = new();
+    public LicensingSettings Licensing { get; set; } = new();
+}
+
+/// <summary>Section "Licensing" — bật/tắt và thời lượng dùng thử.</summary>
+public sealed class LicensingSettings
+{
+    public bool Enabled { get; set; } = true;
+    public int TrialDays { get; set; } = 14;
 }
 
 /// <summary>Section "Reader" — cách nối với máy quét.</summary>
