@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CccdCheckIn.Core\CccdCheckIn.Core.csproj" />
+    <ProjectReference Include="..\..\src\CccdCheckIn.Licensing.Windows\CccdCheckIn.Licensing.Windows.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 ﻿using System.Security.Cryptography;
 using CccdCheckIn.Core.Licensing;
 using CccdCheckIn.LicenseIssuer;
+using CccdCheckIn.Licensing.Windows;
 
 var help = """
     CccdCheckIn LicenseIssuer — tool nội bộ phát hành license (KHÔNG ship cho khách).
@@ -9,6 +10,11 @@ var help = """
         Tạo (hoặc load) private key ký license, lưu tại:
         %ProgramData%\LTTuan\LicenseIssuer\private-key.json
         In PUBLIC KEY (base64 SPKI) — paste vào EmbeddedKeys.LicensePublicKeyBase64 trong app.
+
+    show-machine
+        In Mã Máy ĐẦY ĐỦ (machineKeyHash base64url) của MÁY NÀY — chính là chuỗi
+        app CccdCheckIn hiển thị/copy trong màn hình Bản quyền. Dùng để đối chiếu
+        khi khách gửi Mã Máy, hoặc kiểm tra license sinh ra khớp đúng máy.
 
     issue --key <path|default> --machine <MãMáy> --plan monthly|yearly [--days N] [--out file]
         Ký license cho Mã Máy. Mã Máy = machineKeyHash đầy đủ (base64url SHA-256 của
@@ -38,6 +44,17 @@ switch (args[0].ToLowerInvariant())
         Console.WriteLine(publicKey);
         Console.WriteLine();
         Console.WriteLine("Private key: " + SigningKeyStore.DefaultKeyFile);
+        return 0;
+    }
+
+    case "show-machine":
+    {
+        var identity = new DpapiMachineKeyStore().GetOrCreateAsync().GetAwaiter().GetResult();
+        Console.WriteLine("Mã Máy (đầy đủ — gửi chuỗi này đi):");
+        Console.WriteLine(identity.MachineKeyHash);
+        Console.WriteLine();
+        Console.WriteLine("Mã Máy rút gọn (chỉ để đối chiếu bằng mắt):");
+        Console.WriteLine(identity.MachineCode);
         return 0;
     }
 
