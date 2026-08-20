@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CccdCheckIn.Core\CccdCheckIn.Core.csproj" />
+    <ProjectReference Include="..\CccdCheckIn.Reader.Serial\CccdCheckIn.Reader.Serial.csproj" />
+    <ProjectReference Include="..\CccdCheckIn.Storage.Sqlite\CccdCheckIn.Storage.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11" />
+    <PackageReference Include="System.IO.Ports" Version="10.0.11" />
+    <PackageReference Include="System.Management" Version="10.0.11" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <!-- Loại bỏ Form1 mặc định (MainForm tự vẽ layout, không dùng designer). -->
+  <ItemGroup>
+    <Compile Remove="Form1.cs;Form1.Designer.cs" />
+  </ItemGroup>
+
+  <!-- appsettings.json phải nằm cạnh exe (cả khi debug lẫn publish). -->
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
