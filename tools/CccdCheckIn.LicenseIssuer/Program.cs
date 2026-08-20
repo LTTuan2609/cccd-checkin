@@ -20,7 +20,7 @@ var help = """
     Ví dụ:
       LicenseIssuer create-keys
       LicenseIssuer issue --machine Aa1b2C3dE4fG5hI6jK7lM8nO9pQ0rS1tU2vW3xY4z5 --plan yearly
-      LicenseIssuer issue --machine Aa1b2C3dE4fG5hI6jK --days 30 --out D:\\LIC.license
+      LicenseIssuer issue --machine Aa1b2C3dE4fG5hI6jK7lM8nO9pQ0rS1tU2vW3xY4z5 --days 30 --out D:\\LIC.license
     """;
 
 if (args.Length == 0)

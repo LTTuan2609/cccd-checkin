@@ -119,9 +119,17 @@ public sealed class LicenseService : ILicenseService
         }
 
         var payload = _canonicalizer.Parse(canonical);
-        if (payload is null || payload.Product != LicensingDefaults.Product)
+        if (payload is null || payload.Product != LicensingDefaults.Product ||
+            payload.Version != LicensingDefaults.PayloadVersion)
         {
             return Fail(LicenseStatus.Malformed, "Mã kích hoạt không dành cho sản phẩm này.");
+        }
+
+        // Cùng bộ kiểm tra với Evaluate — không lưu mã chưa hiệu lực, vì lưu xong
+        // Evaluate sẽ báo NotYetValid/Malformed mãi mãi dù mã đúng.
+        if (nowUtc < payload.NotBeforeUtc)
+        {
+            return Fail(LicenseStatus.NotYetValid, "Mã kích hoạt chưa đến ngày hiệu lực.");
         }
 
         if (payload.MachineKeyHash != identity.MachineKeyHash)

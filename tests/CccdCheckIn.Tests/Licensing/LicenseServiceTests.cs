@@ -152,6 +152,28 @@ public class LicenseServiceTests : IDisposable
     }
 
     [Fact]
+    public void Activate_FutureDatedCode_RejectedAndNotSaved()
+    {
+        var code = SignCode(notBefore: Now.AddDays(1));
+
+        var result = _service.Activate(code, Now);
+
+        Assert.Equal(LicenseStatus.NotYetValid, result.Status);
+        Assert.Null(_store.LoadLicense());
+    }
+
+    [Fact]
+    public void Activate_WrongVersionCode_RejectedAndNotSaved()
+    {
+        var code = SignCode(version: 99);
+
+        var result = _service.Activate(code, Now);
+
+        Assert.Equal(LicenseStatus.Malformed, result.Status);
+        Assert.Null(_store.LoadLicense());
+    }
+
+    [Fact]
     public void Evaluate_TrialMarkerMismatch_Tampered()
     {
         // Tạo trial hợp lệ trước.
@@ -182,11 +204,12 @@ public class LicenseServiceTests : IDisposable
     private string SignCode(
         DateTimeOffset? expiresAt = null,
         DateTimeOffset? notBefore = null,
-        string? machineKeyHash = null)
+        string? machineKeyHash = null,
+        int? version = null)
     {
         var payload = new LicensePayload
         {
-            Version = LicensingDefaults.PayloadVersion,
+            Version = version ?? LicensingDefaults.PayloadVersion,
             Product = LicensingDefaults.Product,
             LicenseId = "TEST-001",
             MachineKeyHash = machineKeyHash ?? _machine.MachineKeyHash,

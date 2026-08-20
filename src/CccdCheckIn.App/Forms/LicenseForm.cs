@@ -15,6 +15,7 @@ public sealed class LicenseForm : Form
     private readonly Action _refreshMain;
 
     private TextBox _lblMachineCode = null!;
+    private Label _lblMachineCaption = null!;
     private Label _lblStatus = null!;
     private TextBox _txtCode = null!;
     private Button _btnCopy = null!;
@@ -65,8 +66,8 @@ public sealed class LicenseForm : Form
 
         var intro = new Label
         {
-            Text = "Vui lòng gửi Mã Máy bên dưới cho nhà cung cấp kèm thông tin đăng ký. " +
-                   "Bạn sẽ nhận Mã Kích Hoạt, dán vào ô bên dưới rồi bấm Kích hoạt.",
+            Text = "Sao chép NGUYÊN chuỗi Mã Máy bên dưới (không rút gọn) gửi nhà cung cấp " +
+                   "kèm thông tin đăng ký. Bạn sẽ nhận Mã Kích Hoạt, dán vào ô bên dưới rồi bấm Kích hoạt.",
             Dock = DockStyle.Fill,
             AutoSize = false,
             Font = new Font("Segoe UI", 9f),
@@ -74,7 +75,7 @@ public sealed class LicenseForm : Form
             Padding = new Padding(0, 0, 0, 8),
         };
 
-        var machineLabel = new Label
+        _lblMachineCaption = new Label
         {
             Text = "Mã Máy (gửi cho nhà cung cấp):",
             Dock = DockStyle.Fill,
@@ -170,24 +171,26 @@ public sealed class LicenseForm : Form
         actionRow.Controls.Add(_btnImport);
         actionRow.Controls.Add(_btnDone);
 
-        // Nút Sao chép đặt cạnh ô Mã Máy (trong 1 panel cùng hàng) — rõ ràng, dễ thấy.
-        var machineRow = new FlowLayoutPanel
+        // Nút Sao chép đặt cạnh ô Mã Máy. TableLayoutPanel chứ KHÔNG phải FlowLayoutPanel —
+        // Flow bỏ qua Dock=Fill khiến ô mã chỉ render ~100px, cắt mất chuỗi 43 ký tự.
+        var machineRow = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             AutoSize = false,
             Height = 36,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
+            ColumnCount = 2,
             Padding = new Padding(0, 2, 0, 2),
         };
+        machineRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        machineRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _lblMachineCode.Height = 28;
         _btnCopy.Height = 28;
         _btnCopy.Margin = new Padding(8, 0, 0, 0);
-        machineRow.Controls.Add(_lblMachineCode);
-        machineRow.Controls.Add(_btnCopy);
+        machineRow.Controls.Add(_lblMachineCode, 0, 0);
+        machineRow.Controls.Add(_btnCopy, 1, 0);
 
         layout.Controls.Add(intro, 0, 0);
-        layout.Controls.Add(machineLabel, 0, 1);
+        layout.Controls.Add(_lblMachineCaption, 0, 1);
         layout.Controls.Add(machineRow, 0, 2);
         layout.Controls.Add(statusWrapper, 0, 3);
         layout.Controls.Add(codeLabel, 0, 4);
@@ -202,7 +205,11 @@ public sealed class LicenseForm : Form
         try
         {
             var identity = _identity.GetOrCreateAsync().GetAwaiter().GetResult();
-            _lblMachineCode.Text = identity.MachineCode;
+            // CRITICAL: phải hiển thị/copy MachineKeyHash ĐẦY ĐỦ (base64url SHA-256) —
+            // issuer bind license vào đúng chuỗi này. MachineCode rút gọn (LT-XXXX-…)
+            // chỉ dùng để đối chiếu bằng mắt, gửi nó đi thì kích hoạt luôn MachineMismatch.
+            _lblMachineCode.Text = identity.MachineKeyHash;
+            _lblMachineCaption.Text = $"Mã Máy ({identity.MachineCode}) — gửi NGUYÊN chuỗi bên dưới:";
         }
         catch (Exception ex)
         {

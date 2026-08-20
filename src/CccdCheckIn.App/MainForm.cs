@@ -80,13 +80,18 @@ public partial class MainForm : Form
         _lblLicenseInfo.Visible = true;
         _btnLicense.Visible = true;
 
-        // Hết hạn: không khởi động nghe reader + tắt nút kết nối lại (không ghi được mới).
+        // Hết hạn: dừng reader + tắt nút kết nối lại (không ghi được mới).
+        // KHÔNG gọi Start() khi form chưa có handle (ctor) — Start() có thể bắn sự kiện
+        // đồng bộ → BeginInvoke ném "window handle has not yet been created". Khởi động
+        // lần đầu do OnShown đảm nhận; nhánh dưới chỉ phục vụ trường hợp kích hoạt
+        // thành công khi app ĐANG chạy (handle đã tồn tại).
         if (!canCheckIn)
         {
             _pipeline.Stop();
             _btnReconnect.Enabled = false;
         }
-        else if (_ui.AutoStartListening && !_autoStarted)
+        else if (IsHandleCreated && _ui.AutoStartListening &&
+                 _pipeline.Reader.State is ReaderState.Disconnected or ReaderState.Error)
         {
             _pipeline.Start();
         }
@@ -268,7 +273,11 @@ public partial class MainForm : Form
         };
         _lblStatus.Text = text;
         _lblStatus.ForeColor = color;
-        _btnReconnect.Enabled = e.State is ReaderState.Reconnecting or ReaderState.Error;
+        // Chỉ cho reconnect khi license còn cho ghi — nếu thiếu điều kiện này,
+        // ApplyReaderState sẽ bật lại nút mà ApplyLicenseState vừa tắt khi hết hạn
+        // → bypass license qua nút Kết nối lại.
+        _btnReconnect.Enabled = e.State is ReaderState.Reconnecting or ReaderState.Error
+                                && (_root.Gate is null || _root.Gate.CanCheckIn);
     }
 
     private enum AlertKind { None, Warning, Error }
@@ -337,6 +346,13 @@ public partial class MainForm : Form
 
     private void OnReconnectClicked(object? sender, EventArgs e)
     {
+        // Chặn bypass lần 2 (lớp phòng thủ sau ApplyReaderState): hết hạn không được
+        // resume chấm công qua nút Kết nối lại dù nút có lỡ được bật.
+        if (_root.Gate is not null && !_root.Gate.CanCheckIn)
+        {
+            ShowAlert("License hết hạn — bấm Bản quyền để gia hạn trước khi kết nối máy quét.", AlertKind.Warning);
+            return;
+        }
         try
         {
             _pipeline.Reader.Start();
