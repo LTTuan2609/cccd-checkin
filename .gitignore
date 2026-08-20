@@ -14,5 +14,8 @@ Data/            # checkin.db (dữ liệu công dân), crash.log, rejected.log
 .vs/
 *.user
 *.suo
-.claude//Program.csproj
+.claude/
+
+# File lạc không thuộc dự án
+/Program.csproj
 /tz.csproj
