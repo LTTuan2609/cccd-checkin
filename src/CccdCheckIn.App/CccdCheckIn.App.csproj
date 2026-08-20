@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CccdCheckIn.Core\CccdCheckIn.Core.csproj" />
+    <ProjectReference Include="..\CccdCheckIn.Licensing.Windows\CccdCheckIn.Licensing.Windows.csproj" />
     <ProjectReference Include="..\CccdCheckIn.Reader.Serial\CccdCheckIn.Reader.Serial.csproj" />
     <ProjectReference Include="..\CccdCheckIn.Storage.Sqlite\CccdCheckIn.Storage.Sqlite.csproj" />
   </ItemGroup>

@@ -53,6 +53,8 @@ public static class AppConfigFactory
             cfg.Store.SaveFields = [.. Storage.Sqlite.SqliteCheckInStore.DefaultSaveFields];
         if (cfg.Export.Fields is not { Count: > 0 })
             cfg.Export.Fields = [.. Storage.Sqlite.CheckInCsvExporter.DefaultFields];
+        if (cfg.Licensing.TrialDays <= 0)
+            cfg.Licensing.TrialDays = 14;
     }
 
     /// <summary>
@@ -97,7 +99,7 @@ public static class AppConfigFactory
 
         var json = JsonSerializer.Serialize(new
         {
-            config.Reader, config.Scan, config.Store, config.Ui, config.Export,
+            config.Reader, config.Scan, config.Store, config.Ui, config.Export, config.Licensing,
         }, new JsonSerializerOptions { WriteIndented = true, Converters = { new JsonStringEnumConverter() } });
 
         if (existing.Count > 0)

@@ -1,5 +1,6 @@
 using CccdCheckIn.Core;
 using CccdCheckIn.Core.Contracts;
+using CccdCheckIn.Core.Licensing;
 using CccdCheckIn.Core.Models;
 using CccdCheckIn.Core.Parsing;
 
@@ -31,11 +32,13 @@ public sealed class CheckInPipeline : IDisposable, IAsyncDisposable
     private readonly IRejectedLogStore? _rejectedLog;
     private readonly DuplicateScanGuard _guard;
     private readonly bool _logRejectedScans;
+    private readonly ILicenseGate? _licenseGate;
     private bool _disposed;
 
     public CheckInPipeline(ICccdReader reader, IQrPayloadParser parser, ICheckInStore store,
                            DuplicateScanGuard guard, bool logRejectedScans,
-                           IRejectedLogStore? rejectedLog = null)
+                           IRejectedLogStore? rejectedLog = null,
+                           ILicenseGate? licenseGate = null)
     {
         _reader = reader;
         _parser = parser;
@@ -43,6 +46,7 @@ public sealed class CheckInPipeline : IDisposable, IAsyncDisposable
         _guard = guard;
         _logRejectedScans = logRejectedScans;
         _rejectedLog = rejectedLog;
+        _licenseGate = licenseGate;
 
         _reader.CardScanned += OnCardScanned;
         _reader.StateChanged += OnStateChanged;
@@ -81,6 +85,20 @@ public sealed class CheckInPipeline : IDisposable, IAsyncDisposable
             }
 
             var citizen = result.Citizen;
+
+            // Licensing: khi hết hạn/chưa kích hoạt KHÔNG ghi nhận chấm công mới.
+            // Dữ liệu cũ vẫn đọc/xuất bình thường (ILicenseGate đảm bảo chỉ chặn ghi).
+            if (_licenseGate is not null && !_licenseGate.CanCheckIn)
+            {
+                if (_logRejectedScans)
+                    LogRejected(rawPayload, "license hết hạn — chỉ đọc/xuất");
+                return new ScanOutcome
+                {
+                    Accepted = false,
+                    Message = "License hết hạn — không thể ghi nhận chấm công mới. " +
+                              "Dữ liệu cũ vẫn xem và xuất được. Hãy gia hạn để tiếp tục.",
+                };
+            }
 
             // Chống quét trùng: cũng là CCCD trong cửa sổ — bỏ qua, không ghi log.
             if (_guard.IsDuplicate(citizen.CccdNumber))
